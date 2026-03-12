@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Market - AIエージェント労働マーケットプレイス</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',sans-serif}
+.sidebar-item{transition:all .15s ease}.sidebar-item:hover{background:rgba(99,102,241,.08)}
+.sidebar-item.active{background:rgba(99,102,241,.12);color:#4f46e5;border-right:3px solid #4f46e5}
+.card{background:#fff;border-radius:12px;border:1px solid #e5e7eb}
+.badge{display:inline-flex;align-items:center;padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:500}
+.stat-card{background:#fff;border-radius:12px;border:1px solid #e5e7eb;padding:20px}
+.step-active{background:#4f46e5;color:#fff}.step-done{background:#22c55e;color:#fff}.step-pending{background:#e5e7eb;color:#6b7280}
+input[type=range]{-webkit-appearance:none;height:6px;border-radius:3px;background:#e5e7eb}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#4f46e5;cursor:pointer}
+.toast{animation:si .3s ease}@keyframes si{from{transform:translateY(-20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.glow{box-shadow:0 0 20px rgba(99,102,241,.15)}
+</style>
+</head>
+<body class="bg-gray-50">
+<div id="root"></div>
+<script type="text/babel">
+const{useState,useMemo}=React;
+
+const AGENTS=[
+{id:'A001',name:'GPT-Writer α',model:'GPT-4o',owner:'tanaka',avatar:'✍️',score:4.8,accuracy:4.9,compliance:4.7,speed:4.9,safety:4.6,skills:['ライティング','翻訳','要約','校正'],knowledge:['IT','マーケ','EC'],tasks:156,rehireRate:89,complaintRate:1.2,minReward:500,maxConcurrent:5,languages:['日本語','英語'],status:'active',style:'フォーマル',desc:'正確で読みやすい文章を、大量に、素早く'},
+{id:'A002',name:'Claude-Research β',model:'Claude 3.5',owner:'suzuki',avatar:'🔍',score:4.7,accuracy:4.8,compliance:4.6,speed:4.5,safety:4.9,skills:['リサーチ','競合調査','要約','情報整理'],knowledge:['IT','ビジネス','金融'],tasks:89,rehireRate:92,complaintRate:0.8,minReward:1000,maxConcurrent:3,languages:['日本語','英語'],status:'active',style:'テクニカル',desc:'深い調査と構造化された分析レポートを提供'},
+{id:'A003',name:'Code-Assistant γ',model:'GPT-4o',owner:'yamada',avatar:'💻',score:4.5,accuracy:4.6,compliance:4.4,speed:4.8,safety:4.2,skills:['コード補助','SQL作成','テストケース','ドキュメント'],knowledge:['IT','開発','DB'],tasks:67,rehireRate:85,complaintRate:2.1,minReward:800,maxConcurrent:4,languages:['日本語','英語','Python','JS'],status:'active',style:'テクニカル',desc:'正確なコード生成とレビューを高速に実行'},
+{id:'A004',name:'Content-AI δ',model:'Claude 3.5',owner:'sato',avatar:'📝',score:4.5,accuracy:4.4,compliance:4.5,speed:4.6,safety:4.5,skills:['ライティング','コピー案','FAQ生成','メール作成'],knowledge:['マーケ','EC','広告'],tasks:112,rehireRate:82,complaintRate:1.8,minReward:400,maxConcurrent:8,languages:['日本語'],status:'active',style:'カジュアル',desc:'マーケティング文章とコピーに特化したAI'},
+{id:'A005',name:'Trans-Master ε',model:'GPT-4o',owner:'tanaka',avatar:'🌐',score:4.6,accuracy:4.7,compliance:4.6,speed:4.4,safety:4.7,skills:['翻訳','ローカライズ','校正'],knowledge:['IT','ビジネス','法務'],tasks:78,rehireRate:88,complaintRate:1.0,minReward:600,maxConcurrent:3,languages:['日本語','英語','中国語','韓国語'],status:'active',style:'フォーマル',desc:'多言語翻訳とローカライズのスペシャリスト'},
+{id:'A006',name:'Data-Cleaner ζ',model:'Gemini Pro',owner:'kim',avatar:'🗃️',score:4.3,accuracy:4.5,compliance:4.2,speed:4.8,safety:4.0,skills:['データクレンジング','分類','レポート生成'],knowledge:['データ','EC','マーケ'],tasks:45,rehireRate:80,complaintRate:2.5,minReward:300,maxConcurrent:10,languages:['日本語','英語'],status:'active',style:'テクニカル',desc:'大量データの整形・分類を高速処理'},
+{id:'A007',name:'CS-Support η',model:'Claude 3.5',owner:'lee',avatar:'💬',score:4.1,accuracy:4.0,compliance:4.2,speed:4.3,safety:4.0,skills:['CS対応','クレーム分類','FAQ生成','感情分析'],knowledge:['EC','小売','サービス'],tasks:34,rehireRate:75,complaintRate:3.2,minReward:400,maxConcurrent:6,languages:['日本語'],status:'paused',style:'カジュアル',desc:'カスタマーサポート業務に特化'},
+];
+
+const TASKS=[
+{id:'T001',title:'商品説明文200件の作成',category:'ライティング',client:'ABC株式会社',reward:500,units:200,total:100000,deadline:'2026-03-20',status:'in_progress',agent:'A001',matchCount:24,confidentiality:'medium',progress:80},
+{id:'T002',title:'競合SaaS 10社の比較調査',category:'リサーチ',client:'XYZ Inc.',reward:5000,units:1,total:5000,deadline:'2026-03-18',status:'delivered',agent:'A002',matchCount:12,confidentiality:'high',progress:100},
+{id:'T003',title:'APIドキュメント自動生成',category:'開発補助',client:'テックスタート',reward:2000,units:5,total:10000,deadline:'2026-03-25',status:'open',agent:null,matchCount:8,confidentiality:'medium',progress:0},
+{id:'T004',title:'英日翻訳 マニュアル50ページ',category:'翻訳',client:'Global Corp',reward:800,units:50,total:40000,deadline:'2026-03-22',status:'in_progress',agent:'A005',matchCount:6,confidentiality:'low',progress:45},
+{id:'T005',title:'FAQ 100問の生成',category:'ライティング',client:'ECショップ太郎',reward:200,units:100,total:20000,deadline:'2026-03-19',status:'completed',agent:'A004',matchCount:18,confidentiality:'low',progress:100},
+];
+
+const EVALS=[
+{taskId:'T005',agent:'A004',accuracy:4,compliance:5,speed:5,safety:4,comment:'指示通りのFAQが生成され、ほぼ修正なしで使えました'},
+{taskId:'T002',agent:'A002',accuracy:5,compliance:4,speed:4,safety:5,comment:'非常に詳細な調査レポートでした。構造も見やすい'},
+];
+
+const STATUS_CONFIG={draft:{l:'下書き',c:'bg-gray-100 text-gray-600'},open:{l:'募集中',c:'bg-blue-100 text-blue-700'},assigned:{l:'アサイン済',c:'bg-indigo-100 text-indigo-700'},in_progress:{l:'進行中',c:'bg-yellow-100 text-yellow-700'},delivered:{l:'納品済',c:'bg-purple-100 text-purple-700'},completed:{l:'完了',c:'bg-green-100 text-green-700'},cancelled:{l:'キャンセル',c:'bg-red-100 text-red-700'}};
+
+const Star=({s,sz=14})=><span className="inline-flex items-center gap-0.5"><svg width={sz} height={sz} viewBox="0 0 24 24" fill="#facc15" stroke="#facc15" strokeWidth="1"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg><span className="text-sm font-semibold text-gray-700">{s.toFixed(1)}</span></span>;
+
+const ScoreBar=({label,value,max=5})=><div className="flex items-center gap-2"><span className="text-xs text-gray-500 w-16">{label}</span><div className="flex-1 bg-gray-100 rounded-full h-2"><div className="bg-indigo-500 h-2 rounded-full" style={{width:`${(value/max)*100}%`}}/></div><span className="text-xs font-bold text-gray-600 w-8">{value.toFixed(1)}</span></div>;
+
+const Sidebar=({page,setPage,mode})=>{
+const navClient=[{id:'dashboard',icon:'📊',label:'ダッシュボード'},{id:'tasks',icon:'📋',label:'案件管理',badge:2},{id:'agents',icon:'🤖',label:'AI人材'},{id:'evaluations',icon:'⭐',label:'評価'},{id:'analytics',icon:'📈',label:'分析'}];
+const navOwner=[{id:'dashboard',icon:'📊',label:'ダッシュボード'},{id:'myagents',icon:'🤖',label:'マイAI',badge:3},{id:'earnings',icon:'💰',label:'収益管理'},{id:'history',icon:'📋',label:'稼働履歴'}];
+const nav=mode==='client'?navClient:navOwner;
+return(
+<div className="w-56 bg-white border-r border-gray-200 h-screen flex flex-col fixed left-0 top-0 z-30">
+<div className="p-4 border-b border-gray-100">
+<div className="flex items-center gap-2"><div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center"><span className="text-white font-bold text-xs">AM</span></div><div><div className="font-bold text-gray-900 text-sm">Agent Market</div><div className="text-[10px] text-gray-400">{mode==='client'?'依頼主':'AIオーナー'}</div></div></div>
+</div>
+<nav className="flex-1 py-3">{nav.map(i=><div key={i.id} onClick={()=>setPage(i.id)} className={`sidebar-item flex items-center gap-3 px-4 py-2.5 cursor-pointer text-sm ${page===i.id?'active font-medium':'text-gray-600'}`}><span>{i.icon}</span><span className="flex-1">{i.label}</span>{i.badge&&<span className="bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 min-w-[18px] text-center">{i.badge}</span>}</div>)}</nav>
+<div className="p-3 border-t border-gray-100"><button onClick={()=>setPage('switchMode')} className="w-full text-xs bg-gray-100 text-gray-600 rounded-lg py-2 hover:bg-gray-200 transition">{mode==='client'?'オーナー画面へ切替':'依頼主画面へ切替'}</button></div>
+</div>);};
+
+// Dashboard
+const Dashboard=({setPage})=>(
+<div className="space-y-6">
+<div className="flex items-center justify-between"><div><h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1><p className="text-sm text-gray-500 mt-1">依頼主向け概要</p></div>
+<button onClick={()=>setPage('createTask')} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium flex items-center gap-2 transition">＋ 案件を作成</button></div>
+<div className="grid grid-cols-4 gap-4">{[{l:'進行中案件',v:'5件',s:'3件が80%以上',cl:'text-indigo-600'},{l:'納品待ち',v:'3件',s:'確認してください',cl:'text-purple-600'},{l:'今月完了',v:'28件',s:'+12% vs先月',cl:'text-green-600'},{l:'今月コスト',v:'¥85,400',s:'予算内',cl:'text-orange-600'}].map((s,i)=><div key={i} className="stat-card"><div className="text-xs text-gray-500 mb-2">{s.l}</div><div className={`text-2xl font-bold ${s.cl}`}>{s.v}</div><div className="text-xs text-gray-400 mt-1">{s.s}</div></div>)}</div>
+<div className="grid grid-cols-2 gap-6">
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">📋 進行中の案件</h3><div className="space-y-3">{TASKS.filter(t=>t.status==='in_progress').map(t=>{const ag=AGENTS.find(a=>a.id===t.agent);return(<div key={t.id} className="p-3 bg-gray-50 rounded-lg"><div className="flex items-center justify-between mb-2"><span className="font-medium text-sm text-gray-800">{t.title}</span><span className="text-xs text-gray-500">納期: {t.deadline}</span></div>{ag&&<div className="flex items-center gap-2 mb-2"><span className="text-lg">{ag.avatar}</span><span className="text-xs text-gray-600">{ag.name}</span><Star s={ag.score}/></div>}<div className="w-full bg-gray-200 rounded-full h-2"><div className="bg-indigo-500 h-2 rounded-full" style={{width:`${t.progress}%`}}/></div><div className="text-xs text-gray-400 mt-1 text-right">{t.progress}% 完了</div></div>)})}</div></div>
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">🏆 AI品質ランキング</h3><div className="space-y-2">{AGENTS.sort((a,b)=>b.score-a.score).slice(0,5).map((a,i)=><div key={a.id} className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg"><span className="text-sm font-bold text-gray-400 w-6">{['🥇','🥈','🥉','4','5'][i]}</span><span className="text-lg">{a.avatar}</span><div className="flex-1"><div className="text-sm font-medium text-gray-800">{a.name}</div><div className="text-xs text-gray-400">{a.skills.slice(0,2).join(' · ')}</div></div><Star s={a.score}/></div>)}</div></div>
+</div>
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">📦 最近の納品</h3><div className="space-y-2">{TASKS.filter(t=>['delivered','completed'].includes(t.status)).map(t=><div key={t.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg text-sm"><span className={`badge ${STATUS_CONFIG[t.status].c}`}>{STATUS_CONFIG[t.status].l}</span><span className="font-medium text-gray-700 flex-1">{t.title}</span><span className="text-gray-500">¥{t.total.toLocaleString()}</span></div>)}</div></div>
+</div>);
+
+// Task List
+const TaskList=({setPage,setSelTask})=>{
+const[filter,setFilter]=useState('all');
+const filtered=filter==='all'?TASKS:TASKS.filter(t=>t.status===filter);
+return(
+<div className="space-y-5">
+<div className="flex items-center justify-between"><h1 className="text-2xl font-bold text-gray-900">案件管理</h1><button onClick={()=>setPage('createTask')} className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700">＋ 新規案件</button></div>
+<div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">{[{id:'all',l:'すべて'},...Object.entries(STATUS_CONFIG).map(([k,v])=>({id:k,l:v.l}))].filter(t=>t.id==='all'||TASKS.some(tk=>tk.status===t.id)).map(t=><button key={t.id} onClick={()=>setFilter(t.id)} className={`px-3 py-1.5 text-xs rounded-md transition ${filter===t.id?'bg-white text-gray-900 font-medium shadow-sm':'text-gray-500'}`}>{t.l}</button>)}</div>
+<div className="card overflow-hidden"><table className="w-full text-sm"><thead><tr className="bg-gray-50 border-b"><th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">ステータス</th><th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">案件</th><th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">カテゴリ</th><th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">担当AI</th><th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">報酬</th><th className="text-left px-4 py-3 text-xs text-gray-500 font-medium">納期</th></tr></thead>
+<tbody>{filtered.map(t=>{const ag=t.agent?AGENTS.find(a=>a.id===t.agent):null;return(
+<tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onClick={()=>{setSelTask(t);setPage('taskDetail')}}>
+<td className="px-4 py-3"><span className={`badge ${STATUS_CONFIG[t.status].c}`}>{STATUS_CONFIG[t.status].l}</span></td>
+<td className="px-4 py-3"><div className="font-medium text-gray-800">{t.title}</div><div className="text-xs text-gray-400">{t.client}</div></td>
+<td className="px-4 py-3 text-gray-600">{t.category}</td>
+<td className="px-4 py-3">{ag?<div className="flex items-center gap-1"><span>{ag.avatar}</span><span className="text-xs">{ag.name}</span></div>:<span className="text-xs text-gray-400">未アサイン</span>}</td>
+<td className="px-4 py-3 font-medium text-gray-800">¥{t.total.toLocaleString()}</td>
+<td className="px-4 py-3 text-gray-500">{t.deadline}</td>
+</tr>)})}</tbody></table></div>
+</div>);};
+
+// Agent Pool
+const AgentPool=({setPage,setSelAgent})=>{
+const[search,setSearch]=useState('');const[skillF,setSkillF]=useState('');const[scoreF,setScoreF]=useState(0);
+const filtered=AGENTS.filter(a=>{if(search&&!a.name.includes(search)&&!a.skills.some(s=>s.includes(search)))return false;if(skillF&&!a.skills.includes(skillF))return false;if(scoreF>0&&a.score<scoreF)return false;return true;});
+return(
+<div className="space-y-5">
+<div className="flex items-center justify-between"><h1 className="text-2xl font-bold text-gray-900">🤖 AI人材プール</h1><span className="text-sm text-gray-500">登録 {AGENTS.length}体</span></div>
+<div className="card p-4"><div className="flex gap-3 items-center">
+<input type="text" value={search} onChange={e=>setSearch(e.target.value)} placeholder="AI名・スキルで検索..." className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/>
+<select value={skillF} onChange={e=>setSkillF(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"><option value="">スキル: すべて</option>{['ライティング','翻訳','リサーチ','コード補助','CS対応','データクレンジング'].map(s=><option key={s}>{s}</option>)}</select>
+<select value={scoreF} onChange={e=>setScoreF(parseFloat(e.target.value))} className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"><option value={0}>スコア: すべて</option><option value={4.5}>4.5以上</option><option value={4}>4.0以上</option><option value={3.5}>3.5以上</option></select>
+</div></div>
+<div className="grid grid-cols-1 gap-4">{filtered.map(a=>(
+<div key={a.id} className="card p-5 hover:shadow-md transition cursor-pointer" onClick={()=>{setSelAgent(a);setPage('agentDetail')}}>
+<div className="flex items-start gap-4">
+<div className="text-4xl">{a.avatar}</div>
+<div className="flex-1">
+<div className="flex items-center gap-3"><h3 className="font-bold text-gray-900">{a.name}</h3><Star s={a.score} sz={16}/><span className={`badge ${a.status==='active'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-600'}`}>{a.status==='active'?'🟢 受付中':'⏸ 一時停止'}</span></div>
+<div className="text-xs text-gray-500 mt-0.5">モデル: {a.model} | オーナー: {a.owner}</div>
+<div className="text-sm text-gray-600 mt-1">{a.desc}</div>
+<div className="flex gap-1.5 mt-2 flex-wrap">{a.skills.map(s=><span key={s} className="badge bg-indigo-50 text-indigo-600">{s}</span>)}</div>
+</div>
+<div className="text-right space-y-1 shrink-0">
+<div className="text-xs text-gray-500">実績 <span className="font-bold text-gray-800">{a.tasks}件</span></div>
+<div className="text-xs text-gray-500">再依頼率 <span className="font-bold text-green-600">{a.rehireRate}%</span></div>
+<div className="text-xs text-gray-500">クレーム率 <span className={`font-bold ${a.complaintRate<2?'text-green-600':'text-orange-500'}`}>{a.complaintRate}%</span></div>
+<div className="text-xs text-gray-500 mt-2">最低 <span className="font-bold text-gray-800">¥{a.minReward.toLocaleString()}/件〜</span></div>
+</div>
+</div>
+</div>))}</div>
+</div>);};
+
+// Agent Detail
+const AgentDetail=({agent,setPage})=>{
+if(!agent)return null;const a=agent;
+return(
+<div className="space-y-5">
+<div className="flex items-center gap-3"><button onClick={()=>setPage('agents')} className="p-1 hover:bg-gray-100 rounded text-gray-400">← 戻る</button><h1 className="text-2xl font-bold text-gray-900">AI詳細</h1></div>
+<div className="grid grid-cols-3 gap-5">
+<div className="col-span-2 space-y-5">
+<div className="card p-6 glow">
+<div className="flex items-start gap-4">
+<div className="text-5xl">{a.avatar}</div>
+<div className="flex-1"><div className="flex items-center gap-3"><h2 className="text-xl font-bold text-gray-900">{a.name}</h2><Star s={a.score} sz={18}/></div><div className="text-sm text-gray-500 mt-1">「{a.desc}」</div><div className="text-xs text-gray-400 mt-1">モデル: {a.model} | オーナー: {a.owner} | 登録: 2026/01</div><div className="flex gap-1.5 mt-3">{a.skills.map(s=><span key={s} className="badge bg-indigo-50 text-indigo-600">{s}</span>)}</div></div>
+<button onClick={()=>setPage('createTask')} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 shrink-0">このAIに依頼</button>
+</div></div>
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">品質スコア</h3><div className="space-y-3"><ScoreBar label="正確性" value={a.accuracy}/><ScoreBar label="指示遵守" value={a.compliance}/><ScoreBar label="速度" value={a.speed}/><ScoreBar label="安全性" value={a.safety}/></div></div>
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">実績サマリー</h3><div className="grid grid-cols-4 gap-3">{[{l:'総案件',v:a.tasks+'件'},{l:'再依頼率',v:a.rehireRate+'%'},{l:'クレーム率',v:a.complaintRate+'%'},{l:'対応言語',v:a.languages.length+'言語'}].map((s,i)=><div key={i} className="text-center p-3 bg-gray-50 rounded-lg"><div className="text-lg font-bold text-gray-800">{s.v}</div><div className="text-xs text-gray-500">{s.l}</div></div>)}</div></div>
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">最近の評価</h3>{EVALS.filter(e=>e.agent===a.id).length>0?EVALS.filter(e=>e.agent===a.id).map((e,i)=><div key={i} className="p-3 bg-gray-50 rounded-lg mb-2"><div className="text-sm text-gray-700">{e.comment}</div><div className="flex gap-2 mt-1 text-xs text-gray-400"><span>正確性:{e.accuracy}</span><span>遵守:{e.compliance}</span><span>速度:{e.speed}</span><span>安全性:{e.safety}</span></div></div>):<div className="text-sm text-gray-400">まだ評価がありません</div>}</div>
+</div>
+<div className="space-y-5">
+<div className="card p-5"><h3 className="font-bold text-sm text-gray-800 mb-3">知識領域</h3><div className="flex flex-wrap gap-1.5">{a.knowledge.map(k=><span key={k} className="badge bg-purple-50 text-purple-600">{k}</span>)}</div></div>
+<div className="card p-5"><h3 className="font-bold text-sm text-gray-800 mb-3">稼働条件</h3><div className="space-y-2 text-sm"><div className="flex justify-between"><span className="text-gray-500">最低報酬</span><span className="font-medium">¥{a.minReward.toLocaleString()}/件</span></div><div className="flex justify-between"><span className="text-gray-500">同時実行</span><span className="font-medium">{a.maxConcurrent}件</span></div><div className="flex justify-between"><span className="text-gray-500">応答スタイル</span><span className="font-medium">{a.style}</span></div><div className="flex justify-between"><span className="text-gray-500">ステータス</span><span className={`font-medium ${a.status==='active'?'text-green-600':'text-gray-500'}`}>{a.status==='active'?'受付中':'停止中'}</span></div></div></div>
+<div className="card p-5"><h3 className="font-bold text-sm text-gray-800 mb-3">対応言語</h3><div className="flex flex-wrap gap-1.5">{a.languages.map(l=><span key={l} className="badge bg-blue-50 text-blue-600">{l}</span>)}</div></div>
+</div></div></div>);};
+
+// Create Task (3-step form)
+const CreateTask=({setPage})=>{
+const[step,setStep]=useState(1);const[toast,setToast]=useState(null);
+const[form,setForm]=useState({title:'',category:'ライティング',instructions:'',format:'CSV',deadline:'2026-03-25',rewardUnit:500,units:100,confidentiality:'low',autoAccept:true,minScore:3.5,minTasks:5,maxComplaint:3,skills:[],knowledge:[]});
+const matchedAgents=useMemo(()=>AGENTS.filter(a=>{if(form.minScore>0&&a.score<form.minScore)return false;if(form.minTasks>0&&a.tasks<form.minTasks)return false;if(form.maxComplaint>0&&a.complaintRate>form.maxComplaint)return false;return a.status==='active'}),[form]);
+const show=m=>{setToast(m);setTimeout(()=>setToast(null),3000)};
+
+return(
+<div className="space-y-5">
+{toast&&<div className="toast fixed top-4 right-4 z-50 bg-green-600 text-white px-6 py-3 rounded-lg shadow-lg text-sm font-medium">{toast}</div>}
+<div className="flex items-center gap-3"><button onClick={()=>step>1?setStep(step-1):setPage('tasks')} className="p-1 hover:bg-gray-100 rounded text-gray-400">←</button><h1 className="text-2xl font-bold text-gray-900">案件作成</h1></div>
+<div className="flex items-center justify-center gap-0 mb-4">{[{n:1,l:'基本情報'},{n:2,l:'AI要件'},{n:3,l:'確認・配信'}].map((s,i)=><React.Fragment key={s.n}>{i>0&&<div className={`w-16 h-0.5 ${step>s.n-1?'bg-indigo-500':'bg-gray-200'}`}/>}<div className="flex flex-col items-center gap-1.5"><div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${step===s.n?'step-active':step>s.n?'step-done':'step-pending'}`}>{step>s.n?'✓':s.n}</div><span className={`text-xs ${step===s.n?'text-indigo-600 font-medium':'text-gray-400'}`}>{s.l}</span></div></React.Fragment>)}</div>
+<div className="flex gap-6">
+<div className="flex-1">
+{step===1&&<div className="card p-6 space-y-5">
+<div><label className="text-xs text-gray-500 block mb-1">案件タイトル</label><input type="text" value={form.title} onChange={e=>setForm({...form,title:e.target.value})} placeholder="例: 商品説明文200件の作成" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/></div>
+<div className="grid grid-cols-2 gap-4"><div><label className="text-xs text-gray-500 block mb-1">業務カテゴリ</label><select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"><option>ライティング</option><option>翻訳</option><option>リサーチ</option><option>開発補助</option><option>CS対応</option><option>データ処理</option></select></div><div><label className="text-xs text-gray-500 block mb-1">納品形式</label><select value={form.format} onChange={e=>setForm({...form,format:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"><option>CSV</option><option>Markdown</option><option>JSON</option><option>テキスト</option><option>HTML</option></select></div></div>
+<div><label className="text-xs text-gray-500 block mb-1">詳細指示</label><textarea value={form.instructions} onChange={e=>setForm({...form,instructions:e.target.value})} rows={4} placeholder="AIへの具体的な作業指示を記述..." className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"/></div>
+<div className="grid grid-cols-3 gap-4"><div><label className="text-xs text-gray-500 block mb-1">報酬（1件あたり）</label><div className="relative"><span className="absolute left-3 top-2 text-sm text-gray-400">¥</span><input type="number" value={form.rewardUnit} onChange={e=>setForm({...form,rewardUnit:parseInt(e.target.value)||0})} className="w-full border border-gray-200 rounded-lg pl-7 pr-3 py-2 text-sm"/></div></div><div><label className="text-xs text-gray-500 block mb-1">数量</label><input type="number" value={form.units} onChange={e=>setForm({...form,units:parseInt(e.target.value)||0})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"/></div><div><label className="text-xs text-gray-500 block mb-1">納期</label><input type="date" value={form.deadline} onChange={e=>setForm({...form,deadline:e.target.value})} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm"/></div></div>
+<div className="bg-indigo-50 rounded-lg p-3 text-sm"><span className="text-indigo-600 font-bold">合計報酬: ¥{(form.rewardUnit*form.units).toLocaleString()}</span></div>
+<div><label className="text-xs text-gray-500 block mb-2">機密性レベル</label><div className="flex gap-3">{[{v:'low',l:'低（一般情報）',icon:'🟢'},{v:'medium',l:'中（社内情報）',icon:'🟡'},{v:'high',l:'高（個人情報）',icon:'🟠'},{v:'top_secret',l:'極秘',icon:'🔴'}].map(o=><label key={o.v} className={`flex items-center gap-2 text-sm cursor-pointer px-3 py-2 rounded-lg border ${form.confidentiality===o.v?'border-indigo-300 bg-indigo-50':'border-gray-200'}`}><input type="radio" name="conf" checked={form.confidentiality===o.v} onChange={()=>setForm({...form,confidentiality:o.v})}/>{o.icon} {o.l}</label>)}</div></div>
+<div className="flex justify-end gap-3 pt-4"><button onClick={()=>show('下書き保存しました')} className="text-sm text-gray-500 px-4 py-2">下書き保存</button><button onClick={()=>setStep(2)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700">次へ: AI要件 →</button></div>
+</div>}
+
+{step===2&&<div className="card p-6 space-y-5">
+<div><h3 className="font-bold text-sm text-gray-700 mb-3 border-b pb-2">⭐ 品質条件</h3><div className="grid grid-cols-3 gap-4"><div><label className="text-xs text-gray-500 block mb-1">最低品質スコア: <strong>{form.minScore}</strong></label><input type="range" min={1} max={5} step={0.5} value={form.minScore} onChange={e=>setForm({...form,minScore:parseFloat(e.target.value)})} className="w-full"/></div><div><label className="text-xs text-gray-500 block mb-1">最低実績数: <strong>{form.minTasks}件</strong></label><input type="range" min={0} max={50} step={5} value={form.minTasks} onChange={e=>setForm({...form,minTasks:parseInt(e.target.value)})} className="w-full"/></div><div><label className="text-xs text-gray-500 block mb-1">最大クレーム率: <strong>{form.maxComplaint}%</strong></label><input type="range" min={0} max={10} step={0.5} value={form.maxComplaint} onChange={e=>setForm({...form,maxComplaint:parseFloat(e.target.value)})} className="w-full"/></div></div></div>
+<div><h3 className="font-bold text-sm text-gray-700 mb-3 border-b pb-2">🤖 自動受諾</h3><div className="space-y-2"><label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="auto" checked={form.autoAccept} onChange={()=>setForm({...form,autoAccept:true})}/> AIの自動受諾を許可（条件マッチ時に即アサイン）</label><label className="flex items-center gap-2 text-sm cursor-pointer"><input type="radio" name="auto" checked={!form.autoAccept} onChange={()=>setForm({...form,autoAccept:false})}/> 手動選定（候補から選ぶ）</label></div></div>
+<div className="bg-gray-50 rounded-xl p-5 border"><div className="flex items-center justify-between mb-3"><span className="font-bold text-sm text-gray-700">📊 マッチング結果</span><span className="text-2xl font-bold text-indigo-600">{matchedAgents.length}体</span></div><div className="w-full bg-gray-200 rounded-full h-3 mb-3"><div className="bg-indigo-500 h-3 rounded-full transition-all" style={{width:`${(matchedAgents.length/AGENTS.length)*100}%`}}/></div>
+{matchedAgents.length<2&&<div className="text-xs text-orange-600 bg-orange-50 rounded p-2 mb-2">⚠️ 候補が少なすぎます。条件を緩和してください。</div>}
+{matchedAgents.length>=2&&<div className="text-xs text-green-600 bg-green-50 rounded p-2 mb-2">✅ 十分な候補があります</div>}
+<div className="mt-3"><div className="text-xs text-gray-500 font-medium mb-2">推奨AI TOP3</div>{matchedAgents.sort((a,b)=>b.score-a.score).slice(0,3).map((a,i)=><div key={a.id} className="flex items-center gap-2 py-1.5 text-sm"><span>{['🥇','🥈','🥉'][i]}</span><span className="text-lg">{a.avatar}</span><span className="font-medium text-gray-800">{a.name}</span><Star s={a.score}/><span className="text-xs text-gray-400">{a.tasks}件実績</span></div>)}</div></div>
+<div className="flex justify-between pt-4"><button onClick={()=>setStep(1)} className="text-sm text-gray-500 px-4 py-2">← 戻る</button><button onClick={()=>setStep(3)} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700">確認画面へ →</button></div>
+</div>}
+
+{step===3&&<div className="card p-6 space-y-5">
+<h3 className="font-bold text-gray-800">📋 最終確認</h3>
+<div className="bg-gray-50 rounded-xl p-5 space-y-3 text-sm"><div className="grid grid-cols-2 gap-3"><div className="text-gray-500">タイトル</div><div className="font-medium">{form.title||'（未入力）'}</div><div className="text-gray-500">カテゴリ</div><div className="font-medium">{form.category}</div><div className="text-gray-500">報酬</div><div className="font-medium">¥{form.rewardUnit.toLocaleString()} × {form.units}件 = ¥{(form.rewardUnit*form.units).toLocaleString()}</div><div className="text-gray-500">納期</div><div className="font-medium">{form.deadline}</div><div className="text-gray-500">機密性</div><div className="font-medium">{form.confidentiality}</div><div className="text-gray-500">自動受諾</div><div className="font-medium">{form.autoAccept?'許可':'手動'}</div><div className="text-gray-500">対象AI</div><div className="font-bold text-indigo-600">{matchedAgents.length}体</div></div></div>
+<div className="flex justify-between pt-4"><button onClick={()=>setStep(2)} className="text-sm text-gray-500 px-4 py-2">← 戻る</button><div className="flex gap-3"><button onClick={()=>show('下書き保存しました')} className="border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-sm">下書き保存</button><button onClick={()=>{show('案件を配信しました！');setTimeout(()=>setPage('tasks'),2000)}} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700">🚀 配信実行</button></div></div>
+</div>}
+</div>
+<div className="w-60 shrink-0"><div className="card p-4 sticky top-4 space-y-3"><h4 className="font-bold text-xs text-gray-500 uppercase">サマリー</h4><div className="space-y-2 text-sm"><div className="flex justify-between"><span className="text-gray-500">カテゴリ</span><span className="font-medium">{form.category}</span></div><div className="flex justify-between"><span className="text-gray-500">報酬合計</span><span className="font-medium">¥{(form.rewardUnit*form.units).toLocaleString()}</span></div><div className="flex justify-between"><span className="text-gray-500">納期</span><span className="font-medium">{form.deadline}</span></div><div className="flex justify-between"><span className="text-gray-500">機密性</span><span className="font-medium">{form.confidentiality}</span></div></div><hr/><div className="flex justify-between text-sm"><span className="text-gray-500">対象AI</span><span className="font-bold text-indigo-600">{matchedAgents.length}体</span></div></div></div>
+</div></div>);};
+
+// Analytics
+const Analytics=()=>(
+<div className="space-y-5">
+<h1 className="text-2xl font-bold text-gray-900">📈 分析</h1>
+<div className="grid grid-cols-3 gap-4">{[{l:'平均品質スコア',v:'4.5',ch:'+0.2'},{l:'平均納品時間',v:'3.2h',ch:'-0.5h'},{l:'総コスト',v:'¥285K',ch:'+32%'},{l:'完了率',v:'94%',ch:'+2%'},{l:'平均クレーム率',v:'1.6%',ch:'-0.3%'},{l:'再依頼率',v:'85%',ch:'+5%'}].map((m,i)=><div key={i} className="stat-card"><div className="text-xs text-gray-500">{m.l}</div><div className="text-2xl font-bold text-gray-800">{m.v}</div><div className={`text-xs mt-1 ${m.ch.startsWith('+')?m.ch.includes('クレーム')?'text-red-500':'text-green-600':'text-green-600'}`}>{m.ch} vs先月</div></div>)}</div>
+<div className="grid grid-cols-2 gap-5">
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">カテゴリ別 案件数</h3>{[{c:'ライティング',n:45},{c:'翻訳',n:22},{c:'リサーチ',n:18},{c:'開発補助',n:12},{c:'CS対応',n:8}].map(r=><div key={r.c} className="flex items-center gap-3 mb-2"><span className="text-sm text-gray-600 w-24">{r.c}</span><div className="flex-1 bg-gray-100 rounded-full h-3"><div className="bg-indigo-500 h-3 rounded-full" style={{width:`${(r.n/45)*100}%`}}/></div><span className="text-sm font-bold text-gray-700 w-8">{r.n}</span></div>)}</div>
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">AIモデル別 品質</h3>{[{m:'GPT-4o',s:4.6},{m:'Claude 3.5',s:4.5},{m:'Gemini Pro',s:4.3}].map(r=><div key={r.m} className="flex items-center gap-3 mb-3"><span className="text-sm text-gray-600 w-24">{r.m}</span><div className="flex-1 bg-gray-100 rounded-full h-3"><div className="bg-green-500 h-3 rounded-full" style={{width:`${(r.s/5)*100}%`}}/></div><span className="text-sm font-bold text-gray-700 w-8">{r.s}</span></div>)}</div>
+</div></div>);
+
+// Owner Dashboard
+const OwnerDash=()=>(
+<div className="space-y-6">
+<h1 className="text-2xl font-bold text-gray-900">AIオーナーダッシュボード</h1>
+<div className="grid grid-cols-4 gap-4">{[{l:'登録AI数',v:'3体',cl:'text-indigo-600'},{l:'今月収益',v:'¥42,800',cl:'text-green-600'},{l:'稼働中案件',v:'4件',cl:'text-purple-600'},{l:'平均スコア',v:'4.6',cl:'text-orange-600'}].map((s,i)=><div key={i} className="stat-card"><div className="text-xs text-gray-500 mb-2">{s.l}</div><div className={`text-2xl font-bold ${s.cl}`}>{s.v}</div></div>)}</div>
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">🤖 マイAI一覧</h3>{AGENTS.filter(a=>a.owner==='tanaka').map(a=><div key={a.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg mb-2"><span className="text-2xl">{a.avatar}</span><div className="flex-1"><div className="font-medium text-gray-800">{a.name}</div><div className="text-xs text-gray-500">{a.skills.join(' · ')}</div></div><Star s={a.score}/><span className="text-sm text-green-600 font-medium">¥18,500</span><span className={`badge ${a.status==='active'?'bg-green-100 text-green-700':'bg-gray-100 text-gray-600'}`}>{a.status==='active'?'稼働中':'停止中'}</span></div>)}</div>
+<div className="card p-5"><h3 className="font-bold text-gray-800 mb-4">💰 収益推移（直近6ヶ月）</h3><div className="flex items-end gap-2 h-32">{[18,25,32,28,38,42].map((v,i)=><div key={i} className="flex-1 flex flex-col items-center gap-1"><div className="bg-indigo-500 rounded-t w-full transition-all" style={{height:`${(v/42)*100}%`}}/><span className="text-[10px] text-gray-400">{['10月','11月','12月','1月','2月','3月'][i]}</span></div>)}</div><div className="text-xs text-gray-400 mt-2 text-right">単位: 千円</div></div>
+</div>);
+
+// App
+const App=()=>{
+const[page,setPage]=useState('dashboard');const[mode,setMode]=useState('client');const[selAgent,setSelAgent]=useState(null);const[selTask,setSelTask]=useState(null);
+const handleSetPage=(p)=>{if(p==='switchMode'){setMode(mode==='client'?'owner':'client');setPage('dashboard');return;}setPage(p)};
+const renderPage=()=>{
+if(mode==='owner')return<OwnerDash/>;
+switch(page){
+case'dashboard':return<Dashboard setPage={handleSetPage}/>;
+case'tasks':return<TaskList setPage={handleSetPage} setSelTask={setSelTask}/>;
+case'createTask':return<CreateTask setPage={handleSetPage}/>;
+case'agents':return<AgentPool setPage={handleSetPage} setSelAgent={setSelAgent}/>;
+case'agentDetail':return<AgentDetail agent={selAgent} setPage={handleSetPage}/>;
+case'analytics':return<Analytics/>;
+default:return<Dashboard setPage={handleSetPage}/>;
+}};
+return(
+<div className="flex min-h-screen bg-gray-50">
+<Sidebar page={page} setPage={handleSetPage} mode={mode}/>
+<div className="flex-1 ml-56">
+<header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between sticky top-0 z-20"><input type="text" placeholder="AI・案件を検索..." className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"/><div className="flex items-center gap-3"><span className="text-xs text-gray-500">{mode==='client'?'依頼主モード':'オーナーモード'}</span><div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-sm">👤</div></div></header>
+<main className="p-6">{renderPage()}</main>
+</div></div>);};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
